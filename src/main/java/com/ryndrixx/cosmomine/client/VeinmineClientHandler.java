@@ -6,6 +6,7 @@ import com.ryndrixx.cosmomine.network.VeinmineKeyPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 public class VeinmineClientHandler {
@@ -17,23 +18,32 @@ public class VeinmineClientHandler {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
 
-        // Sync veinmine key state to server when it changes
+        // Sync key state to server when it changes
         boolean keyDown = KeyBindings.VEINMINE.isDown();
         if (keyDown != lastKeyState) {
             lastKeyState = keyDown;
             PacketDistributor.sendToServer(new VeinmineKeyPayload(keyDown));
         }
+    }
 
-        // Cycle shape mode on keypress
-        while (KeyBindings.CYCLE_SHAPE.consumeClick()) {
-            currentShape = currentShape.next();
-            PacketDistributor.sendToServer(new ShapeModePayload(currentShape));
-            mc.player.displayClientMessage(
-                Component.literal("§bCosmoMine§r: " + currentShape.displayName +
-                    " — " + currentShape.description),
-                true // action bar, not chat
-            );
-        }
+    /** Scroll wheel while holding ~ cycles the shape mode. */
+    public static void onMouseScroll(InputEvent.MouseScrollingEvent event) {
+        if (!KeyBindings.VEINMINE.isDown()) return;
+
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
+
+        // Consume the scroll so the inventory/hotbar doesn't also scroll
+        event.setCanceled(true);
+
+        currentShape = event.getScrollDeltaY() > 0 ? currentShape.next() : currentShape.previous();
+        PacketDistributor.sendToServer(new ShapeModePayload(currentShape));
+
+        mc.player.displayClientMessage(
+            Component.literal("§bCosmoMine§r: " + currentShape.displayName +
+                " — " + currentShape.description),
+            true // action bar
+        );
     }
 
     public static ShapeMode getCurrentShape() {

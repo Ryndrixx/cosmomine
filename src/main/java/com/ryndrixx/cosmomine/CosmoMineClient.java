@@ -6,6 +6,7 @@ import com.ryndrixx.cosmomine.client.VeinmineClientHandler;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -18,6 +19,7 @@ public class CosmoMineClient {
         modEventBus.addListener(KeyBindings::register);
 
         NeoForge.EVENT_BUS.addListener(VeinmineClientHandler::onClientTick);
+        NeoForge.EVENT_BUS.addListener(VeinmineClientHandler::onMouseScroll);
         NeoForge.EVENT_BUS.addListener(VeinHighlightRenderer::onRenderLevel);
     }
 }

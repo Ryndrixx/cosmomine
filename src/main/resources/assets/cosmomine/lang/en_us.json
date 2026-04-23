@@ -1,5 +1,4 @@
 {
   "key.categories.cosmomine": "CosmoMine",
-  "key.cosmomine.veinmine": "Veinmine (hold while mining)",
-  "key.cosmomine.cycle_shape": "Cycle Mining Shape"
+  "key.cosmomine.veinmine": "Veinmine (hold ~ while mining, scroll to change shape)"
 }

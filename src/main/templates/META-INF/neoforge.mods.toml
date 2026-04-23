@@ -7,6 +7,7 @@ modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
 displayURL="https://github.com/Ryndrixx/cosmomine"
+logoFile="cosmomine.png"
 description='''
 Custom veinminer for the Blockbusters Aeronautics modpack.
 Hold V to veinmine. Press ` to cycle mining shapes.
