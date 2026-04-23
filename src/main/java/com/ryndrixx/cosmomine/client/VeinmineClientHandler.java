@@ -1,5 +1,6 @@
 package com.ryndrixx.cosmomine.client;
 
+import com.ryndrixx.cosmomine.Config;
 import com.ryndrixx.cosmomine.ShapeMode;
 import com.ryndrixx.cosmomine.network.ShapeModePayload;
 import com.ryndrixx.cosmomine.network.VeinmineKeyPayload;
@@ -32,6 +33,9 @@ public class VeinmineClientHandler {
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
+
+        // If requireSneakToCycle is enabled, sneak must also be held
+        if (Config.REQUIRE_SNEAK_TO_CYCLE.get() && !mc.player.isShiftKeyDown()) return;
 
         // Consume the scroll so the inventory/hotbar doesn't also scroll
         event.setCanceled(true);

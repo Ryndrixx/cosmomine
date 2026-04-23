@@ -32,6 +32,8 @@ public class VeinmineLogic {
 
     // -------------------------------------------------------------------------
     // VEIN: BFS, same block type, up to MAX_BLOCKS
+    // Checks all 26 neighbors (face, edge, and corner diagonals) so that
+    // diagonal connections like acacia tree leaves are included.
     // -------------------------------------------------------------------------
     private static List<BlockPos> vein(LevelReader level, BlockPos origin, BlockState target) {
         int max = Config.MAX_BLOCKS.get();
@@ -46,12 +48,17 @@ public class VeinmineLogic {
             BlockPos cur = queue.poll();
             result.add(cur);
 
-            for (Direction dir : Direction.values()) {
-                BlockPos neighbor = cur.relative(dir);
-                if (visited.add(neighbor)) {
-                    BlockState ns = level.getBlockState(neighbor);
-                    if (ns.getBlock() == target.getBlock()) {
-                        queue.add(neighbor);
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        if (dx == 0 && dy == 0 && dz == 0) continue;
+                        BlockPos neighbor = cur.offset(dx, dy, dz);
+                        if (visited.add(neighbor)) {
+                            BlockState ns = level.getBlockState(neighbor);
+                            if (ns.getBlock() == target.getBlock()) {
+                                queue.add(neighbor);
+                            }
+                        }
                     }
                 }
             }

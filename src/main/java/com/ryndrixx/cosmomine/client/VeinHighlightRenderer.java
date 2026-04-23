@@ -1,12 +1,15 @@
 package com.ryndrixx.cosmomine.client;
 
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import com.ryndrixx.cosmomine.ShapeMode;
 import com.ryndrixx.cosmomine.logic.VeinmineLogic;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
@@ -18,8 +21,27 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.OptionalDouble;
 
 public class VeinHighlightRenderer {
+
+    /** Lines render type with depth test disabled — outlines show through blocks (x-ray). */
+    private static final RenderType LINES_NO_DEPTH = RenderType.create(
+        "cosmomine_lines_no_depth",
+        DefaultVertexFormat.POSITION_COLOR_NORMAL,
+        VertexFormat.Mode.LINES,
+        256,
+        RenderType.CompositeState.builder()
+            .setShaderState(RenderStateShard.RENDERTYPE_LINES_SHADER)
+            .setLineState(new RenderStateShard.LineStateShard(OptionalDouble.empty()))
+            .setLayeringState(RenderStateShard.VIEW_OFFSET_Z_LAYERING)
+            .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
+            .setOutputState(RenderStateShard.ITEM_ENTITY_TARGET)
+            .setWriteMaskState(RenderStateShard.COLOR_WRITE)
+            .setCullState(RenderStateShard.NO_CULL)
+            .setDepthTestState(RenderStateShard.NO_DEPTH_TEST)
+            .createCompositeState(false)
+    );
 
     private static List<BlockPos> previewBlocks = Collections.emptyList();
     private static BlockPos lastTarget = null;
@@ -58,7 +80,7 @@ public class VeinHighlightRenderer {
         PoseStack poseStack = event.getPoseStack();
 
         var bufferSource = mc.renderBuffers().bufferSource();
-        VertexConsumer lines = bufferSource.getBuffer(RenderType.lines());
+        VertexConsumer lines = bufferSource.getBuffer(LINES_NO_DEPTH);
 
         float expand = 0.004f;
         for (int i = 1; i < previewBlocks.size(); i++) { // skip [0] = origin (MC highlights it)
@@ -75,6 +97,6 @@ public class VeinHighlightRenderer {
             );
         }
 
-        bufferSource.endBatch(RenderType.lines());
+        bufferSource.endBatch(LINES_NO_DEPTH);
     }
 }

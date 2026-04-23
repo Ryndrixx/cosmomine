@@ -45,12 +45,13 @@ Located at `config/cosmomine-common.toml` in your Minecraft instance folder.
 | `maxBlocks` | 64 | Max blocks per veinmine operation (1–256) |
 | `requireCorrectTool` | true | Only veinmine blocks your current tool can harvest |
 | `consumeHunger` | false | Each extra block costs a small amount of hunger |
+| `requireSneakToCycle` | false | Require holding Sneak (shift) + **~** to scroll-cycle shape modes |
 
 ---
 
 ## Installation
 
-Drop `cosmomine-0.2.0.jar` into your `mods/` folder alongside NeoForge 1.21.1.
+Drop `cosmomine-0.3.0.jar` into your `mods/` folder alongside NeoForge 1.21.1.
 
 ---
 
@@ -60,7 +61,7 @@ Drop `cosmomine-0.2.0.jar` into your `mods/` folder alongside NeoForge 1.21.1.
 git clone https://github.com/Ryndrixx/cosmomine
 cd cosmomine
 ./gradlew build
-# Output: build/libs/cosmomine-0.2.0.jar
+# Output: build/libs/cosmomine-0.3.0.jar
 ```
 
 Requires Java 21.
