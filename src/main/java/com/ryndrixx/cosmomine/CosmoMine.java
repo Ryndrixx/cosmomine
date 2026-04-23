@@ -1,6 +1,7 @@
 package com.ryndrixx.cosmomine;
 
 import com.mojang.logging.LogUtils;
+import com.ryndrixx.cosmomine.handler.PlantAndPlaceServerHandler;
 import com.ryndrixx.cosmomine.handler.VeinmineServerHandler;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -25,6 +26,7 @@ public class CosmoMine {
 
         NeoForge.EVENT_BUS.addListener(VeinmineServerHandler::onBlockBreak);
         NeoForge.EVENT_BUS.addListener(VeinmineServerHandler::onPlayerLeave);
+        NeoForge.EVENT_BUS.addListener(PlantAndPlaceServerHandler::onRightClick);
 
         LOGGER.info("CosmoMine loaded. Hold [V] to veinmine, [` ] to cycle shapes.");
     }

@@ -126,8 +126,11 @@ public class VeinmineServerHandler {
         IN_VEINMINE.remove(id);
     }
 
-    /** Expose shape map read-only for other classes that need it. */
     public static ShapeMode getShape(UUID playerId) {
         return SHAPES.getOrDefault(playerId, ShapeMode.VEIN);
+    }
+
+    public static boolean isActive(UUID playerId) {
+        return ACTIVE.contains(playerId);
     }
 }

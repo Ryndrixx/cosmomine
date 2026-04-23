@@ -1,17 +1,23 @@
 # CosmoMine
 
+![CosmoMine](src/main/resources/cosmomine.png)
+
 A custom veinminer mod for the **Blockbusters Aeronautics** modpack. Built for NeoForge 1.21.1.
 
 ---
 
 ## How to Use
 
-| Action | Key |
+| Action | How |
 |--------|-----|
-| Veinmine | Hold **~** (tilde) while mining a block |
+| Veinmine | Hold **~** while mining a block |
 | Cycle shape | Scroll mouse wheel **while holding ~** |
+| Mass plant seeds | Hold a seed + hold **~** + right-click farmland |
+| Mass place blocks | Hold a block + hold **~** + right-click a surface |
 
 The current shape mode appears in your action bar when you scroll.
+
+Mass planting flood-fills all connected farmland with seeds. Mass placing fills a 3×3 grid on the clicked surface.
 
 ---
 
@@ -44,7 +50,7 @@ Located at `config/cosmomine-common.toml` in your Minecraft instance folder.
 
 ## Installation
 
-Drop `cosmomine-0.1.0.jar` into your `mods/` folder alongside NeoForge 1.21.1.
+Drop `cosmomine-0.2.0.jar` into your `mods/` folder alongside NeoForge 1.21.1.
 
 ---
 
@@ -54,7 +60,7 @@ Drop `cosmomine-0.1.0.jar` into your `mods/` folder alongside NeoForge 1.21.1.
 git clone https://github.com/Ryndrixx/cosmomine
 cd cosmomine
 ./gradlew build
-# Output: build/libs/cosmomine-0.1.0.jar
+# Output: build/libs/cosmomine-0.2.0.jar
 ```
 
 Requires Java 21.
