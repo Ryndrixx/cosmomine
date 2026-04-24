@@ -8,24 +8,19 @@ import com.ryndrixx.cosmomine.ShapeMode;
 import com.ryndrixx.cosmomine.logic.VeinmineLogic;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.OptionalDouble;
+import java.util.*;
 
 public class VeinHighlightRenderer {
 
-    /** Lines render type with depth test disabled — outlines show through blocks (x-ray). */
     private static final RenderType LINES_NO_DEPTH = RenderType.create(
         "cosmomine_lines_no_depth",
         DefaultVertexFormat.POSITION_COLOR_NORMAL,
@@ -42,6 +37,20 @@ public class VeinHighlightRenderer {
             .setDepthTestState(RenderStateShard.NO_DEPTH_TEST)
             .createCompositeState(false)
     );
+
+    // For each of 6 faces: 4 edges as [corner_dx, corner_dy, corner_dz, axis(0=X,1=Y,2=Z)]
+    private static final int[][][] FACE_EDGES = {
+        {{0,0,0,0},{1,0,0,2},{0,0,1,0},{0,0,0,2}}, // DOWN  (y-1)
+        {{0,1,0,0},{1,1,0,2},{0,1,1,0},{0,1,0,2}}, // UP    (y+1)
+        {{0,0,0,0},{1,0,0,1},{0,1,0,0},{0,0,0,1}}, // NORTH (z-1)
+        {{0,0,1,0},{1,0,1,1},{0,1,1,0},{0,0,1,1}}, // SOUTH (z+1)
+        {{0,0,0,1},{0,1,0,2},{0,0,1,1},{0,0,0,2}}, // WEST  (x-1)
+        {{1,0,0,1},{1,1,0,2},{1,0,1,1},{1,0,0,2}}, // EAST  (x+1)
+    };
+
+    private static final int[][] FACE_NEIGHBORS = {
+        {0,-1,0},{0,1,0},{0,0,-1},{0,0,1},{-1,0,0},{1,0,0}
+    };
 
     private static List<BlockPos> previewBlocks = Collections.emptyList();
     private static BlockPos lastTarget = null;
@@ -63,7 +72,6 @@ public class VeinHighlightRenderer {
         BlockPos target = hit.getBlockPos();
         ShapeMode currentMode = VeinmineClientHandler.getCurrentShape();
 
-        // Recompute preview every 4 ticks or when target/mode changes
         long tick = mc.level.getGameTime();
         if (tick - lastUpdateTick >= 4 || !target.equals(lastTarget) || currentMode != lastMode) {
             BlockState state = mc.level.getBlockState(target);
@@ -73,28 +81,59 @@ public class VeinHighlightRenderer {
             lastUpdateTick = tick;
         }
 
-        if (previewBlocks.size() <= 1) return;
+        if (previewBlocks.isEmpty()) return;
+
+        Set<BlockPos> selectionSet = new HashSet<>(previewBlocks);
+
+        // Anchor coordinates for bit-packing edge keys
+        int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
+        for (BlockPos p : previewBlocks) {
+            if (p.getX() < minX) minX = p.getX();
+            if (p.getY() < minY) minY = p.getY();
+            if (p.getZ() < minZ) minZ = p.getZ();
+        }
+
+        // Collect only exposed-face edges — inner shared edges are never added,
+        // shared outer edges are deduplicated by the set.
+        // Key packing: axis(2b)|relX(9b)|relY(9b)|relZ(9b) — supports up to 512 block spread.
+        Set<Long> edgeKeys = new HashSet<>();
+        for (BlockPos pos : previewBlocks) {
+            int bx = pos.getX(), by = pos.getY(), bz = pos.getZ();
+            for (int f = 0; f < 6; f++) {
+                int[] nb = FACE_NEIGHBORS[f];
+                if (selectionSet.contains(new BlockPos(bx + nb[0], by + nb[1], bz + nb[2]))) continue;
+                for (int[] e : FACE_EDGES[f]) {
+                    int rx = bx + e[0] - minX;
+                    int ry = by + e[1] - minY;
+                    int rz = bz + e[2] - minZ;
+                    edgeKeys.add(((long) e[3] << 27) | ((long) rx << 18) | ((long) ry << 9) | rz);
+                }
+            }
+        }
 
         Camera camera = event.getCamera();
         Vec3 camPos = camera.getPosition();
         PoseStack poseStack = event.getPoseStack();
-
         var bufferSource = mc.renderBuffers().bufferSource();
-        VertexConsumer lines = bufferSource.getBuffer(LINES_NO_DEPTH);
+        VertexConsumer consumer = bufferSource.getBuffer(LINES_NO_DEPTH);
 
-        float expand = 0.004f;
-        for (int i = 1; i < previewBlocks.size(); i++) { // skip [0] = origin (MC highlights it)
-            BlockPos pos = previewBlocks.get(i);
-            double x = pos.getX() - camPos.x;
-            double y = pos.getY() - camPos.y;
-            double z = pos.getZ() - camPos.z;
+        float r = 0.0f, g = 0.75f, b = 1.0f, a = 0.9f;
+        var mat = poseStack.last();
 
-            LevelRenderer.renderLineBox(
-                poseStack, lines,
-                new AABB(x - expand, y - expand, z - expand,
-                         x + 1 + expand, y + 1 + expand, z + 1 + expand),
-                0.0f, 0.75f, 1.0f, 0.9f // bright cyan
-            );
+        for (long key : edgeKeys) {
+            int axis = (int) ((key >> 27) & 0x3);
+            float x1 = (float) (((int) ((key >> 18) & 0x1FF)) + minX - camPos.x);
+            float y1 = (float) (((int) ((key >> 9)  & 0x1FF)) + minY - camPos.y);
+            float z1 = (float) (((int) (key          & 0x1FF)) + minZ - camPos.z);
+            float x2 = x1 + (axis == 0 ? 1f : 0f);
+            float y2 = y1 + (axis == 1 ? 1f : 0f);
+            float z2 = z1 + (axis == 2 ? 1f : 0f);
+            float nx = axis == 0 ? 1f : 0f;
+            float ny = axis == 1 ? 1f : 0f;
+            float nz = axis == 2 ? 1f : 0f;
+
+            consumer.addVertex(mat, x1, y1, z1).setColor(r, g, b, a).setNormal(mat, nx, ny, nz);
+            consumer.addVertex(mat, x2, y2, z2).setColor(r, g, b, a).setNormal(mat, nx, ny, nz);
         }
 
         bufferSource.endBatch(LINES_NO_DEPTH);
