@@ -38,7 +38,9 @@ Cyan outlines preview which blocks will be mined **before** you break them.
 
 ## Config
 
-Located at `config/cosmomine-common.toml` in your Minecraft instance folder.
+Settings can be changed **in-game** via the Mods list — click the config button next to CosmoMine. No file editing required.
+
+They are also stored at `config/cosmomine-common.toml` if you prefer to edit directly.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -46,12 +48,15 @@ Located at `config/cosmomine-common.toml` in your Minecraft instance folder.
 | `requireCorrectTool` | true | Only veinmine blocks your current tool can harvest |
 | `consumeHunger` | false | Each extra block costs a small amount of hunger |
 | `requireSneakToCycle` | false | Require holding Sneak (shift) + **~** to scroll-cycle shape modes |
+| `color` | `#00BFFF` | Outline highlight color (hex) |
+| `opacity` | 0.9 | Outline opacity (0.0–1.0) |
+| `lineWidth` | 1.5 | Outline line width in pixels (0.5–8.0) |
 
 ---
 
 ## Installation
 
-Drop `cosmomine-0.4.0.jar` into your `mods/` folder alongside NeoForge 1.21.1.
+Drop `cosmomine-0.6.1.jar` into your `mods/` folder alongside NeoForge 1.21.1.
 
 ---
 
@@ -61,7 +66,7 @@ Drop `cosmomine-0.4.0.jar` into your `mods/` folder alongside NeoForge 1.21.1.
 git clone https://github.com/Ryndrixx/cosmomine
 cd cosmomine
 ./gradlew build
-# Output: build/libs/cosmomine-0.4.0.jar
+# Output: build/libs/cosmomine-0.6.1.jar
 ```
 
 Requires Java 21.
