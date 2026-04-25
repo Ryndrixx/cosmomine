@@ -10,6 +10,10 @@ public class Config {
     public static final ModConfigSpec.BooleanValue CONSUME_HUNGER;
     public static final ModConfigSpec.BooleanValue REQUIRE_SNEAK_TO_CYCLE;
 
+    public static final ModConfigSpec.ConfigValue<String> OUTLINE_COLOR;
+    public static final ModConfigSpec.DoubleValue OUTLINE_OPACITY;
+    public static final ModConfigSpec.DoubleValue OUTLINE_WIDTH;
+
     public static final ModConfigSpec SPEC;
 
     static {
@@ -32,6 +36,36 @@ public class Config {
             .define("requireSneakToCycle", false);
 
         BUILDER.pop();
+        BUILDER.push("outline");
+
+        OUTLINE_COLOR = BUILDER
+            .comment("Highlight outline color as a hex string (e.g. #00BFFF for cyan, #FFFFFF for white)")
+            .define("color", "#00BFFF");
+
+        OUTLINE_OPACITY = BUILDER
+            .comment("Highlight outline opacity (0.0 = invisible, 1.0 = fully opaque, default 0.9)")
+            .defineInRange("opacity", 0.9, 0.0, 1.0);
+
+        OUTLINE_WIDTH = BUILDER
+            .comment("Highlight outline line width in pixels (0.5-8.0, default 1.5)")
+            .defineInRange("lineWidth", 1.5, 0.5, 8.0);
+
+        BUILDER.pop();
         SPEC = BUILDER.build();
+    }
+
+    /** Parse the hex color config string into r/g/b floats (0.0-1.0). Falls back to cyan on bad input. */
+    public static float[] parseOutlineColor() {
+        try {
+            String hex = OUTLINE_COLOR.get().trim().replace("#", "");
+            int rgb = Integer.parseUnsignedInt(hex, 16);
+            return new float[]{
+                ((rgb >> 16) & 0xFF) / 255f,
+                ((rgb >> 8)  & 0xFF) / 255f,
+                ( rgb        & 0xFF) / 255f
+            };
+        } catch (Exception e) {
+            return new float[]{0f, 0.75f, 1f}; // default cyan
+        }
     }
 }

@@ -99,6 +99,7 @@ public class VeinmineServerHandler {
                 BlockPos pos = blocks.get(i);
                 BlockState state = player.level().getBlockState(pos);
                 if (state.isAir()) continue;
+                if (!state.getFluidState().isEmpty()) continue; // skip water/lava — no durability cost
 
                 // For non-vein shapes we don't restrict by block type
                 if (mode == ShapeMode.VEIN && state.getBlock() != targetState.getBlock()) continue;

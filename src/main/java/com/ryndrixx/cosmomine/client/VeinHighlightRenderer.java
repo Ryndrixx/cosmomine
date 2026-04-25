@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import com.ryndrixx.cosmomine.Config;
 import com.ryndrixx.cosmomine.ShapeMode;
 import com.ryndrixx.cosmomine.logic.VeinmineLogic;
 import net.minecraft.client.Camera;
@@ -21,23 +22,6 @@ import java.util.*;
 
 public class VeinHighlightRenderer {
 
-    private static final RenderType LINES_NO_DEPTH = RenderType.create(
-        "cosmomine_lines_no_depth",
-        DefaultVertexFormat.POSITION_COLOR_NORMAL,
-        VertexFormat.Mode.LINES,
-        256,
-        RenderType.CompositeState.builder()
-            .setShaderState(RenderStateShard.RENDERTYPE_LINES_SHADER)
-            .setLineState(new RenderStateShard.LineStateShard(OptionalDouble.empty()))
-            .setLayeringState(RenderStateShard.VIEW_OFFSET_Z_LAYERING)
-            .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
-            .setOutputState(RenderStateShard.ITEM_ENTITY_TARGET)
-            .setWriteMaskState(RenderStateShard.COLOR_WRITE)
-            .setCullState(RenderStateShard.NO_CULL)
-            .setDepthTestState(RenderStateShard.NO_DEPTH_TEST)
-            .createCompositeState(false)
-    );
-
     // For each of 6 faces: 4 edges as [corner_dx, corner_dy, corner_dz, axis(0=X,1=Y,2=Z)]
     private static final int[][][] FACE_EDGES = {
         {{0,0,0,0},{1,0,0,2},{0,0,1,0},{0,0,0,2}}, // DOWN  (y-1)
@@ -51,6 +35,33 @@ public class VeinHighlightRenderer {
     private static final int[][] FACE_NEIGHBORS = {
         {0,-1,0},{0,1,0},{0,0,-1},{0,0,1},{-1,0,0},{1,0,0}
     };
+
+    private static RenderType linesNoDepth = null;
+    private static double cachedLineWidth = -1;
+
+    private static RenderType getLineType() {
+        double w = Config.OUTLINE_WIDTH.get();
+        if (linesNoDepth == null || w != cachedLineWidth) {
+            cachedLineWidth = w;
+            linesNoDepth = RenderType.create(
+                "cosmomine_lines_no_depth_" + w,
+                DefaultVertexFormat.POSITION_COLOR_NORMAL,
+                VertexFormat.Mode.LINES,
+                256,
+                RenderType.CompositeState.builder()
+                    .setShaderState(RenderStateShard.RENDERTYPE_LINES_SHADER)
+                    .setLineState(new RenderStateShard.LineStateShard(OptionalDouble.of(w)))
+                    .setLayeringState(RenderStateShard.VIEW_OFFSET_Z_LAYERING)
+                    .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
+                    .setOutputState(RenderStateShard.ITEM_ENTITY_TARGET)
+                    .setWriteMaskState(RenderStateShard.COLOR_WRITE)
+                    .setCullState(RenderStateShard.NO_CULL)
+                    .setDepthTestState(RenderStateShard.NO_DEPTH_TEST)
+                    .createCompositeState(false)
+            );
+        }
+        return linesNoDepth;
+    }
 
     private static List<BlockPos> previewBlocks = Collections.emptyList();
     private static BlockPos lastTarget = null;
@@ -85,7 +96,6 @@ public class VeinHighlightRenderer {
 
         Set<BlockPos> selectionSet = new HashSet<>(previewBlocks);
 
-        // Anchor coordinates for bit-packing edge keys
         int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
         for (BlockPos p : previewBlocks) {
             if (p.getX() < minX) minX = p.getX();
@@ -93,10 +103,10 @@ public class VeinHighlightRenderer {
             if (p.getZ() < minZ) minZ = p.getZ();
         }
 
-        // Collect only exposed-face edges — inner shared edges are never added,
-        // shared outer edges are deduplicated by the set.
-        // Key packing: axis(2b)|relX(9b)|relY(9b)|relZ(9b) — supports up to 512 block spread.
-        Set<Long> edgeKeys = new HashSet<>();
+        // Count how many exposed faces each edge belongs to.
+        // An edge shared by 2 exposed faces is an internal crease — skip it.
+        // An edge on exactly 1 exposed face is a true silhouette edge — render it.
+        Map<Long, Integer> edgeCounts = new HashMap<>();
         for (BlockPos pos : previewBlocks) {
             int bx = pos.getX(), by = pos.getY(), bz = pos.getZ();
             for (int f = 0; f < 6; f++) {
@@ -106,7 +116,8 @@ public class VeinHighlightRenderer {
                     int rx = bx + e[0] - minX;
                     int ry = by + e[1] - minY;
                     int rz = bz + e[2] - minZ;
-                    edgeKeys.add(((long) e[3] << 27) | ((long) rx << 18) | ((long) ry << 9) | rz);
+                    long key = ((long) e[3] << 27) | ((long) rx << 18) | ((long) ry << 9) | rz;
+                    edgeCounts.merge(key, 1, Integer::sum);
                 }
             }
         }
@@ -115,12 +126,18 @@ public class VeinHighlightRenderer {
         Vec3 camPos = camera.getPosition();
         PoseStack poseStack = event.getPoseStack();
         var bufferSource = mc.renderBuffers().bufferSource();
-        VertexConsumer consumer = bufferSource.getBuffer(LINES_NO_DEPTH);
+        RenderType lineType = getLineType();
+        VertexConsumer consumer = bufferSource.getBuffer(lineType);
 
-        float r = 0.0f, g = 0.75f, b = 1.0f, a = 0.9f;
+        float[] rgb = Config.parseOutlineColor();
+        float r = rgb[0], g = rgb[1], b = rgb[2];
+        float a = (float) Config.OUTLINE_OPACITY.get().doubleValue();
         var mat = poseStack.last();
 
-        for (long key : edgeKeys) {
+        for (Map.Entry<Long, Integer> entry : edgeCounts.entrySet()) {
+            if (entry.getValue() != 1) continue; // inner crease — skip
+
+            long key = entry.getKey();
             int axis = (int) ((key >> 27) & 0x3);
             float x1 = (float) (((int) ((key >> 18) & 0x1FF)) + minX - camPos.x);
             float y1 = (float) (((int) ((key >> 9)  & 0x1FF)) + minY - camPos.y);
@@ -136,6 +153,6 @@ public class VeinHighlightRenderer {
             consumer.addVertex(mat, x2, y2, z2).setColor(r, g, b, a).setNormal(mat, nx, ny, nz);
         }
 
-        bufferSource.endBatch(LINES_NO_DEPTH);
+        bufferSource.endBatch(lineType);
     }
 }
