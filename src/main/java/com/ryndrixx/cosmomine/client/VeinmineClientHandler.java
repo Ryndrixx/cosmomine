@@ -22,18 +22,21 @@ public class VeinmineClientHandler {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
 
-        // Sync key state to server when it changes
-        boolean keyDown = KeyBindings.VEINMINE.isDown();
-        if (keyDown != lastKeyState) {
-            lastKeyState = keyDown;
-            PacketDistributor.sendToServer(new VeinmineKeyPayload(keyDown));
-        }
-
-        // Open config screen
         while (KeyBindings.OPEN_CONFIG.consumeClick()) {
             if (mc.screen == null) {
                 mc.setScreen(new ConfigScreen(null));
             }
+        }
+    }
+
+    /** Syncs veinmine key state immediately on press/release — fixes race with right-click packets. */
+    public static void onKey(InputEvent.Key event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
+        boolean keyDown = KeyBindings.VEINMINE.isDown();
+        if (keyDown != lastKeyState) {
+            lastKeyState = keyDown;
+            PacketDistributor.sendToServer(new VeinmineKeyPayload(keyDown));
         }
     }
 

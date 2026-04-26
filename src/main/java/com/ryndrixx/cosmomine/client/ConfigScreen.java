@@ -21,17 +21,21 @@ public class ConfigScreen extends Screen {
 
     private final Screen parent;
 
-    // live working copies
     private int maxBlocks;
     private boolean requireCorrectTool;
-    private boolean consumeHunger;
     private boolean requireSneakToCycle;
     private String outlineColor;
     private double opacity;
     private double lineWidth;
 
-    // widgets that need reading at save time
     private EditBox colorField;
+
+    // y positions set in init(), read in render()
+    private int veinmineHeaderY;
+    private int outlineHeaderY;
+    private int colorLabelY;
+    private int opacityLabelY;
+    private int lineWidthLabelY;
 
     public ConfigScreen(Screen parent) {
         super(Component.literal("CosmoMine Settings"));
@@ -40,57 +44,50 @@ public class ConfigScreen extends Screen {
 
     @Override
     protected void init() {
-        // Load current values
-        maxBlocks          = Config.MAX_BLOCKS.get();
-        requireCorrectTool = Config.REQUIRE_CORRECT_TOOL.get();
-        consumeHunger      = Config.CONSUME_HUNGER.get();
+        maxBlocks           = Config.MAX_BLOCKS.get();
+        requireCorrectTool  = Config.REQUIRE_CORRECT_TOOL.get();
         requireSneakToCycle = Config.REQUIRE_SNEAK_TO_CYCLE.get();
-        outlineColor       = Config.OUTLINE_COLOR.get();
-        opacity            = Config.OUTLINE_OPACITY.get();
-        lineWidth          = Config.OUTLINE_WIDTH.get();
+        outlineColor        = Config.OUTLINE_COLOR.get();
+        opacity             = Config.OUTLINE_OPACITY.get();
+        lineWidth           = Config.OUTLINE_WIDTH.get();
 
-        int cx = this.width / 2;
-        int leftCol = cx - 155;
+        int cx       = this.width / 2;
+        int leftCol  = cx - 155;
         int rightCol = cx + 5;
-        int colW = 150;
-        int rowH = 24;
-        int y = 45;
+        int colW     = 150;
+        int rowH     = 26;
 
-        // ── Veinmine section ──────────────────────────────────────────────
+        // ── Veinmine ──────────────────────────────────────────────────────
+        veinmineHeaderY = 32;
+        int y = veinmineHeaderY + 16;  // 48
 
-        // Max Blocks slider (1-256)
+        // Max Blocks | Require Correct Tool
         addRenderableWidget(new SimpleSlider(leftCol, y, colW, 20,
             "Max Blocks", maxBlocks, 1, 256, true) {
-            @Override protected void onValueChanged(double v) {
-                maxBlocks = (int) Math.round(v);
-            }
+            @Override protected void onValueChanged(double v) { maxBlocks = (int) Math.round(v); }
         });
-
-        // Require Correct Tool toggle
-        addRenderableWidget(Button.builder(boolLabel("Require Correct Tool", requireCorrectTool), b -> {
+        addRenderableWidget(Button.builder(boolLabel("Req. Correct Tool", requireCorrectTool), b -> {
             requireCorrectTool = !requireCorrectTool;
-            b.setMessage(boolLabel("Require Correct Tool", requireCorrectTool));
+            b.setMessage(boolLabel("Req. Correct Tool", requireCorrectTool));
         }).bounds(rightCol, y, colW, 20).build());
-
         y += rowH;
 
-        // Consume Hunger toggle
-        addRenderableWidget(Button.builder(boolLabel("Consume Hunger", consumeHunger), b -> {
-            consumeHunger = !consumeHunger;
-            b.setMessage(boolLabel("Consume Hunger", consumeHunger));
-        }).bounds(leftCol, y, colW, 20).build());
-
-        // Require Sneak to Cycle toggle
+        // Sneak to Cycle
         addRenderableWidget(Button.builder(boolLabel("Sneak to Cycle", requireSneakToCycle), b -> {
             requireSneakToCycle = !requireSneakToCycle;
             b.setMessage(boolLabel("Sneak to Cycle", requireSneakToCycle));
-        }).bounds(rightCol, y, colW, 20).build());
+        }).bounds(leftCol, y, colW, 20).build());
+        y += rowH;
 
-        y += rowH + 16; // gap between sections
+        // ── Outline ───────────────────────────────────────────────────────
+        y += 18;  // section gap
+        outlineHeaderY = y;
+        y += 16;  // below header
 
-        // ── Outline section ───────────────────────────────────────────────
+        colorLabelY   = y;
+        opacityLabelY = y;
+        y += 12;
 
-        // Color hex field
         colorField = new EditBox(this.font, leftCol, y, colW, 20,
             Component.literal("Outline Color"));
         colorField.setMaxLength(7);
@@ -98,25 +95,19 @@ public class ConfigScreen extends Screen {
         colorField.setHint(Component.literal("#00BFFF"));
         addRenderableWidget(colorField);
 
-        // Opacity slider (0.0-1.0)
         addRenderableWidget(new SimpleSlider(rightCol, y, colW, 20,
             "Opacity", opacity, 0.0, 1.0, false) {
-            @Override protected void onValueChanged(double v) {
-                opacity = v;
-            }
+            @Override protected void onValueChanged(double v) { opacity = v; }
         });
-
         y += rowH;
 
-        // Line Width slider (0.5-8.0)
+        lineWidthLabelY = y;
+        y += 12;
+
         addRenderableWidget(new SimpleSlider(leftCol, y, colW, 20,
             "Line Width", lineWidth, 0.5, 8.0, false) {
-            @Override protected void onValueChanged(double v) {
-                lineWidth = v;
-            }
+            @Override protected void onValueChanged(double v) { lineWidth = v; }
         });
-
-        y += rowH + 16;
 
         // ── Done / Cancel ─────────────────────────────────────────────────
         addRenderableWidget(Button.builder(Component.literal("Done"), b -> saveAndClose())
@@ -128,23 +119,21 @@ public class ConfigScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
-        // Title
-        g.drawCenteredString(this.font, this.title, this.width / 2, 14, 0xFFFFFF);
+        int cx      = this.width / 2;
+        int leftCol = cx - 155;
+        int rightCol = cx + 5;
 
-        int cx = this.width / 2;
-        // Section labels
-        g.drawString(this.font, "— Veinmine —", cx - 155, 36, 0xAAAAAA);
-        g.drawString(this.font, "— Outline —",  cx - 155, 36 + 24 + 24 + 10, 0xAAAAAA);
-        // Color field label above the box
-        g.drawString(this.font, "Color (hex)", cx - 155, 36 + 24 + 24 + 10 + 10, 0xCCCCCC);
-        g.drawString(this.font, "Opacity",     cx + 5,   36 + 24 + 24 + 10 + 10, 0xCCCCCC);
-        g.drawString(this.font, "Line Width",  cx - 155, 36 + 24 + 24 + 10 + 10 + 24, 0xCCCCCC);
+        g.drawCenteredString(this.font, this.title, cx, 14, 0xFFFFFF);
+        g.drawString(this.font, "— Veinmine —", leftCol,  veinmineHeaderY, 0xAAAAAA);
+        g.drawString(this.font, "— Outline —",  leftCol,  outlineHeaderY,  0xAAAAAA);
+        g.drawString(this.font, "Color (hex)",  leftCol,  colorLabelY,     0xCCCCCC);
+        g.drawString(this.font, "Opacity",      rightCol, opacityLabelY,   0xCCCCCC);
+        g.drawString(this.font, "Line Width",   leftCol,  lineWidthLabelY, 0xCCCCCC);
     }
 
     private void saveAndClose() {
         Config.MAX_BLOCKS.set(Math.max(1, Math.min(256, maxBlocks)));
         Config.REQUIRE_CORRECT_TOOL.set(requireCorrectTool);
-        Config.CONSUME_HUNGER.set(consumeHunger);
         Config.REQUIRE_SNEAK_TO_CYCLE.set(requireSneakToCycle);
 
         String hex = colorField.getValue().trim();
@@ -162,8 +151,6 @@ public class ConfigScreen extends Screen {
         Minecraft.getInstance().setScreen(parent);
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────
-
     private static Component boolLabel(String name, boolean value) {
         return Component.literal(name + ": ").append(
             value ? Component.literal("ON").withStyle(s -> s.withColor(0x55FF55))
@@ -171,7 +158,6 @@ public class ConfigScreen extends Screen {
         );
     }
 
-    // Generic slider that maps [min, max] → [0, 1] for Minecraft's slider widget
     private abstract static class SimpleSlider extends AbstractSliderButton {
         private final String label;
         private final double min, max;
@@ -179,11 +165,10 @@ public class ConfigScreen extends Screen {
 
         SimpleSlider(int x, int y, int w, int h, String label,
                      double initialValue, double min, double max, boolean isInt) {
-            super(x, y, w, h, Component.empty(),
-                (initialValue - min) / (max - min));
+            super(x, y, w, h, Component.empty(), (initialValue - min) / (max - min));
             this.label = label;
-            this.min = min;
-            this.max = max;
+            this.min   = min;
+            this.max   = max;
             this.isInt = isInt;
             updateMessage();
         }
@@ -199,9 +184,7 @@ public class ConfigScreen extends Screen {
         }
 
         @Override
-        protected void applyValue() {
-            onValueChanged(realValue());
-        }
+        protected void applyValue() { onValueChanged(realValue()); }
 
         protected abstract void onValueChanged(double v);
     }

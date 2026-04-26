@@ -7,7 +7,6 @@ public class Config {
 
     public static final ModConfigSpec.IntValue MAX_BLOCKS;
     public static final ModConfigSpec.BooleanValue REQUIRE_CORRECT_TOOL;
-    public static final ModConfigSpec.BooleanValue CONSUME_HUNGER;
     public static final ModConfigSpec.BooleanValue REQUIRE_SNEAK_TO_CYCLE;
 
     public static final ModConfigSpec.ConfigValue<String> OUTLINE_COLOR;
@@ -26,10 +25,6 @@ public class Config {
         REQUIRE_CORRECT_TOOL = BUILDER
             .comment("Require the correct tool to veinmine a block (default true)")
             .define("requireCorrectTool", true);
-
-        CONSUME_HUNGER = BUILDER
-            .comment("Each extra block mined consumes a small amount of hunger (default false)")
-            .define("consumeHunger", false);
 
         REQUIRE_SNEAK_TO_CYCLE = BUILDER
             .comment("Require holding Sneak (shift) in addition to the veinmine key to scroll-cycle shape modes (default false)")

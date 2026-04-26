@@ -110,9 +110,7 @@ public class VeinmineServerHandler {
                 // destroyBlock handles: drops (with Fortune/Silk Touch), XP, durability, sounds
                 ((ServerPlayer) player).gameMode.destroyBlock(pos);
 
-                if (Config.CONSUME_HUNGER.get()) {
-                    player.causeFoodExhaustion(0.005f);
-                }
+                player.causeFoodExhaustion(0.005f);
             }
         } finally {
             IN_VEINMINE.remove(id);

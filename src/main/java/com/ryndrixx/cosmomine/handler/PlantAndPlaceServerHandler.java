@@ -4,8 +4,14 @@ import com.ryndrixx.cosmomine.Config;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.AxeItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -19,6 +25,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.SpecialPlantable;
+import net.neoforged.neoforge.common.ItemAbilities;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
 import java.util.*;
@@ -37,14 +44,17 @@ public class PlantAndPlaceServerHandler {
         Level level = (Level) event.getLevel();
         BlockPos clickedPos = event.getPos();
         Direction clickedFace = event.getFace();
+        InteractionHand hand = event.getHand();
 
         if (isSeedItem(held) && level.getBlockState(clickedPos).is(Blocks.FARMLAND)) {
-            // Cancel vanilla — we handle all planting including the origin
             event.setCanceled(true);
-            massPlant(player, level, clickedPos, held);
+            massPlant(player, level, clickedPos, held, hand);
+        } else if (held.getItem() instanceof AxeItem && level.getBlockState(clickedPos).is(BlockTags.LOGS)) {
+            event.setCanceled(true);
+            massStrip(player, level, clickedPos, held, hand);
         } else if (held.getItem() instanceof BlockItem blockItem && !isSeedItem(held) && clickedFace != null) {
             BlockPos placeOrigin = clickedPos.relative(clickedFace);
-            massPlace(player, level, placeOrigin, clickedPos, clickedFace, blockItem, held, event.getHand());
+            massPlace(player, level, placeOrigin, clickedPos, clickedFace, blockItem, held, hand);
         }
     }
 
@@ -58,10 +68,7 @@ public class PlantAndPlaceServerHandler {
         return false;
     }
 
-    private static void massPlant(Player player, Level level, BlockPos origin, ItemStack seeds) {
-        if (!(seeds.getItem() instanceof BlockItem blockItem)) return;
-
-        BlockState plantState = blockItem.getBlock().defaultBlockState();
+    private static void massPlant(Player player, Level level, BlockPos origin, ItemStack seeds, InteractionHand hand) {
         int max = Config.MAX_BLOCKS.get();
 
         Set<BlockPos> visited = new HashSet<>();
@@ -73,12 +80,15 @@ public class PlantAndPlaceServerHandler {
         while (!queue.isEmpty() && seeds.getCount() > 0 && planted < max) {
             BlockPos pos = queue.poll();
 
-            BlockPos above = pos.above();
-            if (level.getBlockState(above).isAir()) {
-                level.setBlock(above, plantState, 3);
-                seeds.shrink(1);
-                planted++;
-                if (Config.CONSUME_HUNGER.get()) player.causeFoodExhaustion(0.005f);
+            if (level.getBlockState(pos.above()).isAir()) {
+                BlockHitResult fakeHit = new BlockHitResult(
+                    Vec3.atCenterOf(pos).add(0, 0.5, 0), Direction.UP, pos, false);
+                UseOnContext ctx = new UseOnContext(level, player, hand, seeds, fakeHit);
+                InteractionResult result = seeds.useOn(ctx);
+                if (result.consumesAction()) {
+                    planted++;
+                    player.causeFoodExhaustion(0.005f);
+                }
             }
 
             for (Direction dir : Direction.Plane.HORIZONTAL) {
@@ -94,10 +104,49 @@ public class PlantAndPlaceServerHandler {
         }
     }
 
+    private static void massStrip(Player player, Level level, BlockPos origin, ItemStack axe, InteractionHand hand) {
+        BlockState originState = level.getBlockState(origin);
+        int max = Config.MAX_BLOCKS.get();
+
+        Set<BlockPos> visited = new HashSet<>();
+        Queue<BlockPos> queue = new ArrayDeque<>();
+        queue.add(origin);
+        visited.add(origin);
+        int stripped = 0;
+
+        while (!queue.isEmpty() && stripped < max && !axe.isEmpty()) {
+            BlockPos pos = queue.poll();
+            BlockState state = level.getBlockState(pos);
+            if (state.getBlock() != originState.getBlock()) continue;
+
+            BlockHitResult fakeHit = new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false);
+            UseOnContext ctx = new UseOnContext(level, player, hand, axe, fakeHit);
+            BlockState strippedState = state.getToolModifiedState(ctx, ItemAbilities.AXE_STRIP, false);
+
+            if (strippedState != null) {
+                level.setBlock(pos, strippedState, 11);
+                level.playSound(null, pos, SoundEvents.AXE_STRIP, SoundSource.BLOCKS, 1.0f, 1.0f);
+                axe.hurtAndBreak(1, player, LivingEntity.getSlotForHand(hand));
+                stripped++;
+                player.causeFoodExhaustion(0.005f);
+            }
+
+            for (Direction dir : Direction.values()) {
+                BlockPos neighbor = pos.relative(dir);
+                if (visited.add(neighbor) && level.getBlockState(neighbor).getBlock() == originState.getBlock()) {
+                    queue.add(neighbor);
+                }
+            }
+        }
+
+        if (player instanceof ServerPlayer sp) {
+            sp.inventoryMenu.sendAllDataToRemote();
+        }
+    }
+
     private static void massPlace(Player player, Level level, BlockPos origin,
                                    BlockPos clickedSurface, Direction clickedFace,
                                    BlockItem blockItem, ItemStack held, InteractionHand hand) {
-        // Leave 1 block for vanilla to place at the origin
         int available = held.getCount() - 1;
         if (available <= 0) return;
 
@@ -107,17 +156,15 @@ public class PlantAndPlaceServerHandler {
 
         for (int a = -1; a <= 1 && available > 0 && placed < max; a++) {
             for (int b = -1; b <= 1 && available > 0 && placed < max; b++) {
-                if (a == 0 && b == 0) continue; // origin — vanilla handles it
+                if (a == 0 && b == 0) continue;
 
                 BlockPos pos = origin.relative(axes[0], a).relative(axes[1], b);
                 BlockState existing = level.getBlockState(pos);
                 if (!existing.canBeReplaced()) continue;
 
-                // Use getStateForPlacement so stairs, slabs, etc. orient correctly
                 BlockPos surfacePos = pos.relative(clickedFace.getOpposite());
                 BlockHitResult fakeHit = new BlockHitResult(
-                    Vec3.atCenterOf(pos), clickedFace.getOpposite(), surfacePos, false
-                );
+                    Vec3.atCenterOf(pos), clickedFace.getOpposite(), surfacePos, false);
                 UseOnContext fakeCtx = new UseOnContext(level, player, hand, held.copy(), fakeHit);
                 BlockState toPlace = blockItem.getBlock().getStateForPlacement(new BlockPlaceContext(fakeCtx));
                 if (toPlace == null) toPlace = blockItem.getBlock().defaultBlockState();
@@ -128,7 +175,7 @@ public class PlantAndPlaceServerHandler {
                 available--;
                 placed++;
 
-                if (Config.CONSUME_HUNGER.get()) player.causeFoodExhaustion(0.005f);
+                player.causeFoodExhaustion(0.005f);
             }
         }
     }

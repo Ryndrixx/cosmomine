@@ -18,6 +18,7 @@ public class CosmoMineClient {
         modEventBus.addListener(KeyBindings::register);
 
         NeoForge.EVENT_BUS.addListener(VeinmineClientHandler::onClientTick);
+        NeoForge.EVENT_BUS.addListener(VeinmineClientHandler::onKey);
         NeoForge.EVENT_BUS.addListener(VeinmineClientHandler::onMouseScroll);
         NeoForge.EVENT_BUS.addListener(VeinHighlightRenderer::onRenderLevel);
 
