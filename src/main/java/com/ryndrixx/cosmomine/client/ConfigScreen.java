@@ -1,5 +1,7 @@
 package com.ryndrixx.cosmomine.client;
 
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 import com.ryndrixx.cosmomine.Config;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -11,6 +13,7 @@ import net.minecraft.network.chat.Component;
 
 import java.text.DecimalFormat;
 
+@OnlyIn(Dist.CLIENT)
 public class ConfigScreen extends Screen {
 
     private static final DecimalFormat DF1 = new DecimalFormat("0.0");

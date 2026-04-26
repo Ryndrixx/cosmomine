@@ -1,5 +1,7 @@
 package com.ryndrixx.cosmomine.client;
 
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -20,6 +22,7 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 import java.util.*;
 
+@OnlyIn(Dist.CLIENT)
 public class VeinHighlightRenderer {
 
     // For each of 6 faces: 4 edges as [corner_dx, corner_dy, corner_dz, axis(0=X,1=Y,2=Z)]
@@ -53,7 +56,7 @@ public class VeinHighlightRenderer {
                     .setLineState(new RenderStateShard.LineStateShard(OptionalDouble.of(w)))
                     .setLayeringState(RenderStateShard.VIEW_OFFSET_Z_LAYERING)
                     .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
-                    .setOutputState(RenderStateShard.ITEM_ENTITY_TARGET)
+                    .setOutputState(RenderStateShard.MAIN_TARGET)
                     .setWriteMaskState(RenderStateShard.COLOR_WRITE)
                     .setCullState(RenderStateShard.NO_CULL)
                     .setDepthTestState(RenderStateShard.NO_DEPTH_TEST)
