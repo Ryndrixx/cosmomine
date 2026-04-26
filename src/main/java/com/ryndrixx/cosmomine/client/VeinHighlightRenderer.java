@@ -2,17 +2,19 @@ package com.ryndrixx.cosmomine.client;
 
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.BufferUploader;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.ryndrixx.cosmomine.Config;
 import com.ryndrixx.cosmomine.ShapeMode;
 import com.ryndrixx.cosmomine.logic.VeinmineLogic;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.RenderStateShard;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -38,33 +40,6 @@ public class VeinHighlightRenderer {
     private static final int[][] FACE_NEIGHBORS = {
         {0,-1,0},{0,1,0},{0,0,-1},{0,0,1},{-1,0,0},{1,0,0}
     };
-
-    private static RenderType linesNoDepth = null;
-    private static double cachedLineWidth = -1;
-
-    private static RenderType getLineType() {
-        double w = Config.OUTLINE_WIDTH.get();
-        if (linesNoDepth == null || w != cachedLineWidth) {
-            cachedLineWidth = w;
-            linesNoDepth = RenderType.create(
-                "cosmomine_lines_no_depth_" + w,
-                DefaultVertexFormat.POSITION_COLOR_NORMAL,
-                VertexFormat.Mode.LINES,
-                256,
-                RenderType.CompositeState.builder()
-                    .setShaderState(RenderStateShard.RENDERTYPE_LINES_SHADER)
-                    .setLineState(new RenderStateShard.LineStateShard(OptionalDouble.of(w)))
-                    .setLayeringState(RenderStateShard.VIEW_OFFSET_Z_LAYERING)
-                    .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
-                    .setOutputState(RenderStateShard.MAIN_TARGET)
-                    .setWriteMaskState(RenderStateShard.COLOR_WRITE)
-                    .setCullState(RenderStateShard.NO_CULL)
-                    .setDepthTestState(RenderStateShard.NO_DEPTH_TEST)
-                    .createCompositeState(false)
-            );
-        }
-        return linesNoDepth;
-    }
 
     private static List<BlockPos> previewBlocks = Collections.emptyList();
     private static BlockPos lastTarget = null;
@@ -107,8 +82,8 @@ public class VeinHighlightRenderer {
         }
 
         // Count how many exposed faces each edge belongs to.
-        // An edge shared by 2 exposed faces is an internal crease — skip it.
-        // An edge on exactly 1 exposed face is a true silhouette edge — render it.
+        // Edges on exactly 1 exposed face are silhouette edges — render them.
+        // Edges shared by 2 exposed faces are internal creases — skip them.
         Map<Long, Integer> edgeCounts = new HashMap<>();
         for (BlockPos pos : previewBlocks) {
             int bx = pos.getX(), by = pos.getY(), bz = pos.getZ();
@@ -128,17 +103,25 @@ public class VeinHighlightRenderer {
         Camera camera = event.getCamera();
         Vec3 camPos = camera.getPosition();
         PoseStack poseStack = event.getPoseStack();
-        var bufferSource = mc.renderBuffers().bufferSource();
-        RenderType lineType = getLineType();
-        VertexConsumer consumer = bufferSource.getBuffer(lineType);
+        var mat = poseStack.last();
 
         float[] rgb = Config.parseOutlineColor();
         float r = rgb[0], g = rgb[1], b = rgb[2];
         float a = (float) Config.OUTLINE_OPACITY.get().doubleValue();
-        var mat = poseStack.last();
+        float w = (float) Config.OUTLINE_WIDTH.get().doubleValue();
+
+        RenderSystem.setShader(GameRenderer::getRendertypeLinesShader);
+        RenderSystem.lineWidth(w);
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.disableDepthTest();
+        RenderSystem.disableCull();
+
+        var buffer = Tesselator.getInstance().begin(
+            VertexFormat.Mode.LINES, DefaultVertexFormat.POSITION_COLOR_NORMAL);
 
         for (Map.Entry<Long, Integer> entry : edgeCounts.entrySet()) {
-            if (entry.getValue() != 1) continue; // inner crease — skip
+            if (entry.getValue() != 1) continue;
 
             long key = entry.getKey();
             int axis = (int) ((key >> 27) & 0x3);
@@ -148,15 +131,27 @@ public class VeinHighlightRenderer {
             float x2 = x1 + (axis == 0 ? 1f : 0f);
             float y2 = y1 + (axis == 1 ? 1f : 0f);
             float z2 = z1 + (axis == 2 ? 1f : 0f);
-            // Normal must be perpendicular to the line direction for the line shader to expand correctly
-            float nx = axis == 1 ? 1f : 0f;
-            float ny = axis == 0 ? 1f : 0f;
+
+            // Normal must be non-zero and perpendicular to the line direction.
+            // axis=0 (X): use Y-normal (0,1,0)
+            // axis=1 (Y): use X-normal (1,0,0)
+            // axis=2 (Z): use X-normal (1,0,0)
+            float nx = (axis != 0) ? 1f : 0f;
+            float ny = (axis == 0) ? 1f : 0f;
             float nz = 0f;
 
-            consumer.addVertex(mat, x1, y1, z1).setColor(r, g, b, a).setNormal(mat, nx, ny, nz);
-            consumer.addVertex(mat, x2, y2, z2).setColor(r, g, b, a).setNormal(mat, nx, ny, nz);
+            buffer.addVertex(mat, x1, y1, z1).setColor(r, g, b, a).setNormal(mat, nx, ny, nz);
+            buffer.addVertex(mat, x2, y2, z2).setColor(r, g, b, a).setNormal(mat, nx, ny, nz);
         }
 
-        bufferSource.endBatch(lineType);
+        MeshData mesh = buffer.build();
+        if (mesh != null) {
+            BufferUploader.drawWithShader(mesh);
+        }
+
+        RenderSystem.enableDepthTest();
+        RenderSystem.enableCull();
+        RenderSystem.disableBlend();
+        RenderSystem.lineWidth(1.0f);
     }
 }
