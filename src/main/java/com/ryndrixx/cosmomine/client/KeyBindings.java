@@ -18,7 +18,16 @@ public class KeyBindings {
         "key.categories.cosmomine"
     );
 
+    /** Press to open the CosmoMine config screen. */
+    public static final KeyMapping OPEN_CONFIG = new KeyMapping(
+        "key.cosmomine.open_config",
+        InputConstants.Type.KEYSYM,
+        GLFW.GLFW_KEY_BACKSLASH,
+        "key.categories.cosmomine"
+    );
+
     public static void register(RegisterKeyMappingsEvent event) {
         event.register(VEINMINE);
+        event.register(OPEN_CONFIG);
     }
 }

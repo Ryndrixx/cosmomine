@@ -148,9 +148,10 @@ public class VeinHighlightRenderer {
             float x2 = x1 + (axis == 0 ? 1f : 0f);
             float y2 = y1 + (axis == 1 ? 1f : 0f);
             float z2 = z1 + (axis == 2 ? 1f : 0f);
-            float nx = axis == 0 ? 1f : 0f;
-            float ny = axis == 1 ? 1f : 0f;
-            float nz = axis == 2 ? 1f : 0f;
+            // Normal must be perpendicular to the line direction for the line shader to expand correctly
+            float nx = axis == 1 ? 1f : 0f;
+            float ny = axis == 0 ? 1f : 0f;
+            float nz = 0f;
 
             consumer.addVertex(mat, x1, y1, z1).setColor(r, g, b, a).setNormal(mat, nx, ny, nz);
             consumer.addVertex(mat, x2, y2, z2).setColor(r, g, b, a).setNormal(mat, nx, ny, nz);

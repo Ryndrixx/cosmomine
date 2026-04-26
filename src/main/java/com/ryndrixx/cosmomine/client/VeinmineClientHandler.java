@@ -28,6 +28,13 @@ public class VeinmineClientHandler {
             lastKeyState = keyDown;
             PacketDistributor.sendToServer(new VeinmineKeyPayload(keyDown));
         }
+
+        // Open config screen
+        while (KeyBindings.OPEN_CONFIG.consumeClick()) {
+            if (mc.screen == null) {
+                mc.setScreen(new ConfigScreen(null));
+            }
+        }
     }
 
     /** Scroll wheel while holding ~ cycles the shape mode. */
